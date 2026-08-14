@@ -28,30 +28,27 @@ if HASH is not None:
 
 install_requires = [
     "category-encoders>=2.6.0,<3",  # requires packaging
-    "cornac>=1.15.2,<2",  # requires packaging, tqdm
+    "cornac>=2.3.0,<3",  # requires packaging, tqdm
     "hyperopt>=0.2.7,<1",
-    "lightfm>=1.17,<2",  # requires requests
     "lightgbm>=4.0.0,<5",
     "locust>=2.12.2,<3",  # requires jinja2
     "memory-profiler>=0.61.0,<1",
     "nltk>=3.8.1,<4",  # requires tqdm
-    "notebook>=7.0.0,<8",  # requires ipykernel, jinja2, jupyter, nbconvert, nbformat, packaging, requests
+    "notebook>=6.5.5,<8",  # requires ipykernel, jinja2, jupyter, nbconvert, nbformat, packaging, requests
     "numba>=0.57.0,<1",
+    "numpy<2.0.0",  # See https://github.com/recommenders-team/recommenders/issues/2224
     "pandas>2.0.0,<3.0.0",  # requires numpy
-    "pandera[strategies]>=0.6.5,<0.18;python_version<='3.8'",  # For generating fake datasets
-    "pandera[strategies]>=0.15.0;python_version>='3.9'",
+    "pyarrow>=10.0.1",
     "retrying>=1.3.4,<2",
     "scikit-learn>=1.2.0,<2",  # requires scipy, and introduce breaking change affects feature_extraction.text.TfidfVectorizer.min_df
-    "scikit-surprise>=1.1.3",
-    "scipy>=1.10.1",
     "seaborn>=0.13.0,<1",  # requires matplotlib, packaging
+    "statsmodels>=0.14.4",
     "transformers>=4.27.0,<5",  # requires packaging, pyyaml, requests, tqdm
 ]
 
 # shared dependencies
 extras_require = {
     "gpu": [
-        "fastai>=2.7.11,<3",
         "nvidia-ml-py>=11.525.84",
         "tensorflow>=2.8.4,!=2.9.0.*,!=2.9.1,!=2.9.2,!=2.10.0.*,<2.16",  # Fixed TF due to constant security problems and breaking changes #2073
         "tf-slim>=1.1.0",  # No python_requires in its setup.py
@@ -59,7 +56,7 @@ extras_require = {
     ],
     "spark": [
         "pyarrow>=10.0.1",
-        "pyspark>=3.3.0,<=4",
+        "pyspark>=3.3.0,<4",
     ],
     "dev": [
         "black>=23.3.0",
@@ -80,6 +77,8 @@ extras_require["experimental"] = [
     # nni needs to be upgraded
     "nni==1.5",
     "pymanopt>=0.2.5",
+    "lightfm>=1.17,<2",
+    "scikit-surprise>=1.1.3",  # Put back in core deps when #2224 is fixed
 ]
 
 # The following dependency can be installed as below, however PyPI does not allow direct URLs.
@@ -107,7 +106,6 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",

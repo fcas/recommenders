@@ -90,7 +90,7 @@ def test_column_dtypes_match(rating_true, rating_pred):
             col_rating=DEFAULT_RATING_COL,
             col_prediction=DEFAULT_PREDICTION_COL,
         )
-    
+
     # Drop a column, and there should column mismatch error produced
     rating_true.drop(DEFAULT_USER_COL, axis="columns", inplace=True)
     with pytest.raises(ColumnMismatchError):
@@ -294,6 +294,60 @@ def test_python_map_at_k(rating_true, rating_pred, rating_nohit):
     assert map_at_k(rating_true, rating_pred, k=10) == pytest.approx(0.23613, TOL)
 
 
+def test_python_map_vs_map_at_k(rating_true, rating_pred):
+    """``map_at_k`` and ``map`` differ only in the per-user normalizer.
+
+    ``map_at_k`` divides each user's hit-precision sum by ``min(k, n_relevant)``;
+    ``map`` divides by ``n_relevant`` (Spark MLlib convention). So ``map_at_k >= map``
+    in general, and they coincide when ``k >= n_relevant`` for every user.
+    """
+    # Every user in the fixture has at most 10 relevant items, so at k=10 the two metrics agree.
+    assert map_at_k(rating_true, rating_pred, k=10) == pytest.approx(
+        map(rating_true, rating_pred, k=10), TOL
+    )
+    # User 3 has 10 relevant items > k=5, so map_at_k strictly exceeds map at k=5.
+    assert map_at_k(rating_true, rating_pred, k=5) > map(rating_true, rating_pred, k=5)
+
+
+def test_python_ranking_metrics_by_threshold_are_bounded():
+    rating_true = pd.DataFrame(
+        {
+            DEFAULT_USER_COL: [1, 1, 1, 1],
+            DEFAULT_ITEM_COL: [1, 2, 3, 4],
+            DEFAULT_RATING_COL: [1, 1, 1, 1],
+        }
+    )
+    rating_pred = pd.DataFrame(
+        {
+            DEFAULT_USER_COL: [1, 1, 1, 1],
+            DEFAULT_ITEM_COL: [1, 2, 3, 4],
+            DEFAULT_PREDICTION_COL: [100, 99, 98, 97],
+        }
+    )
+
+    assert precision_at_k(
+        rating_true,
+        rating_pred,
+        relevancy_method="by_threshold",
+        threshold=50,
+        k=2,
+    ) == 1.0
+    assert ndcg_at_k(
+        rating_true,
+        rating_pred,
+        relevancy_method="by_threshold",
+        threshold=50,
+        k=2,
+    ) == 1.0
+    assert map_at_k(
+        rating_true,
+        rating_pred,
+        relevancy_method="by_threshold",
+        threshold=50,
+        k=2,
+    ) == 1.0
+
+
 def test_python_precision_at_k(rating_true, rating_pred, rating_nohit):
     assert (
         precision_at_k(
@@ -375,10 +429,44 @@ def test_python_r_precision(rating_true, rating_pred, rating_nohit):
         k=10,
     ) == pytest.approx(1, TOL)
     assert r_precision_at_k(rating_true, rating_nohit, k=5) == 0.0
-    assert r_precision_at_k(rating_true, rating_pred, k=3) == pytest.approx(0.21111, TOL)
-    assert r_precision_at_k(rating_true, rating_pred, k=5) == pytest.approx(0.24444, TOL)
+    assert r_precision_at_k(rating_true, rating_pred, k=3) == pytest.approx(
+        0.21111, TOL
+    )
+    assert r_precision_at_k(rating_true, rating_pred, k=5) == pytest.approx(
+        0.24444, TOL
+    )
     # Equivalent to precision
-    assert r_precision_at_k(rating_true, rating_pred, k=10) == pytest.approx(0.37777, TOL)
+    assert r_precision_at_k(rating_true, rating_pred, k=10) == pytest.approx(
+        0.37777, TOL
+    )
+
+
+def test_python_ranking_metrics_by_threshold(rating_true, rating_pred):
+    metrics = [precision_at_k, recall_at_k, ndcg_at_k, map_at_k, map]
+
+    # Threshold above all predicted scores → no items selected → all metrics are 0.
+    for metric in metrics:
+        assert metric(
+            rating_true, rating_pred, relevancy_method="by_threshold", k=10, threshold=100
+        ) == 0.0
+
+    # Threshold at or below the minimum predicted score → all items pass → matches top_k.
+    for metric in metrics:
+        assert metric(
+            rating_true, rating_pred, relevancy_method="by_threshold", k=10, threshold=0
+        ) == pytest.approx(
+            metric(rating_true, rating_pred, relevancy_method="top_k", k=10), TOL
+        )
+
+    # threshold=13 keeps only pred >= 13 (top-2 per user); all are true hits.
+    # precision: 2/2 per user → 1.0
+    # recall: (2/3 + 2/5 + 2/10) / 3 = 19/45
+    assert precision_at_k(
+        rating_true, rating_pred, relevancy_method="by_threshold", k=10, threshold=13
+    ) == pytest.approx(1.0, TOL)
+    assert recall_at_k(
+        rating_true, rating_pred, relevancy_method="by_threshold", k=10, threshold=13
+    ) == pytest.approx(19 / 45, TOL)
 
 
 def test_python_auc(rating_true_binary, rating_pred_binary):
@@ -522,9 +610,7 @@ def test_user_diversity(diversity_data):
         col_relevance=None,
     )
     assert_frame_equal(
-        pd.DataFrame(
-            dict(UserId=[1, 2, 3], user_diversity=[0.29289, 1.0, 0.0])
-        ),
+        pd.DataFrame(dict(UserId=[1, 2, 3], user_diversity=[0.29289, 1.0, 0.0])),
         actual,
         check_exact=False,
         atol=TOL,
@@ -625,9 +711,7 @@ def test_user_diversity_item_feature_vector(diversity_data):
         col_relevance=None,
     )
     assert_frame_equal(
-        pd.DataFrame(
-            dict(UserId=[1, 2, 3], user_diversity=[0.5000, 0.5000, 0.5000])
-        ),
+        pd.DataFrame(dict(UserId=[1, 2, 3], user_diversity=[0.5000, 0.5000, 0.5000])),
         actual,
         check_exact=False,
     )
@@ -695,9 +779,7 @@ def test_user_serendipity_item_feature_vector(diversity_data):
         col_relevance="Relevance",
     )
     assert_frame_equal(
-        pd.DataFrame(
-            dict(UserId=[1, 2, 3], user_serendipity=[0.2500, 0.625, 0.3333])
-        ),
+        pd.DataFrame(dict(UserId=[1, 2, 3], user_serendipity=[0.2500, 0.625, 0.3333])),
         actual,
         check_exact=False,
         atol=TOL,

@@ -5,19 +5,32 @@ Licensed under the MIT License.
 
 # Tests
 
+Recommenders test pipeline is one of the most sophisticated MLOps
+pipelines in the open-source community.  We execute tests in the three
+environments we support: CPU, GPU, and Spark, mirroring the tests in
+each Python version we support.  We test not only the library, but
+also the Jupyter notebooks in the examples folder.
+
+The reason to have this extensive test infrastructure is to ensure that the code is reproducible by the community and that we can maintain the project with a small number of core contributors.
+
+We currently execute over a thousand tests in the project, and we are always looking for ways to improve the test coverage. To get the exact number of tests, you can run `pytest tests --collect-only`, and then multiply the number of tests by the number of Python versions we support.
+
 In this document we show our test infrastructure and how to contribute tests to the repository.
 
 ## Table of Contents
 
 - [Test workflows](#test-workflows)
 - [Categories of tests](#categories-of-tests)
-- [Scalable test infrastructure with AzureML](#scalable-test-infrastructure-with-azureml)
+- [Scalable test infrastructure with GitHub Actions](#scalable-test-infrastructure-with-github-actions)
 - [How to contribute tests to the repository](#how-to-contribute-tests-to-the-repository)
     - [How to create tests for the Recommenders library](#how-to-create-tests-for-the-recommenders-library)
     - [How to create tests for the notebooks](#how-to-create-tests-for-the-notebooks)
-    - [How to add tests to the AzureML pipeline](#how-to-add-tests-to-the-azureml-pipeline)
-    - [Setup GitHub Actions with AzureML compute clusters](#setup-github-actions-with-azureml-compute-clusters)
+    - [How to add tests to the GitHub workflows](#How-to-add-tests-to-the-GitHub-workflows)
+- [How to set up the infrastructure](#how-to-set-up-the-infrastructure)
+    - [How to set up GitHub Actions runners](#how-to-set-up-github-actions-runners)
+    - [How to set up Compshare VMs for on-demand creation](#how-to-set-up-compshare-vms-for-on-demand-creation)
 - [How to execute tests in your local environment](#how-to-execute-tests-in-your-local-environment)
+
 
 ## Test workflows
 
@@ -45,21 +58,57 @@ The tests in this repository are divided into the following categories:
 
 For more information, see a [quick introduction testing](https://miguelgfierro.com/blog/2018/a-beginners-guide-to-python-testing/).
 
-## Scalable test infrastructure with AzureML
+## Scalable test infrastructure with GitHub Actions
 
-AzureML is used to run the existing unit, smoke and integration tests. AzureML benefits include being able to run the tests in parallel, managing the compute environment by automatically turning it on/off, automatic logging of artifacts from test runs and more. GitHub is used as a control plane to configure and run the tests on AzureML.  
+GitHub Actions is used to run the existing unit, smoke and integration
+tests.  GitHub Actions benefits include being able to run the tests in
+parallel, and automatic logging of artifacts from test runs and more.
 
-In the following figure we show a workflow on how the tests are executed via AzureML:
+In the following figure we show a workflow on how the tests are
+executed via GitHub Actions:
 
-<img src="https://recodatasets.z20.web.core.windows.net/images/AzureML_tests.svg?sanitize=true">
+<img src="./github-actions-tests.svg">
 
-GitHub workflows `azureml-unit-tests.yml`, `azureml-cpu-nightly.yml`, `azureml-gpu-nightly.yml` and `azureml-spark-nightly` located in [.github/workflows/](../.github/workflows/) are used to run the tests on AzureML. The parameters to configure AzureML are defined in the workflow yml files. The tests are divided into groups and each workflow triggers these test groups in parallel, which significantly reduces end-to-end execution time. 
+GitHub workflows
+[`unit-tests.yml`](../.github/workflows/unit-tests.yml),
+[`cpu-nightly.yml`](../.github/workflows/cpu-nightly.yml),
+[`gpu-nightly.yml`](../.github/workflows/gpu-nightly.yml) and
+[`spark-nightly.yml`](../.github/workflows/spark-nightly.yml) located
+in [.github/workflows/](../.github/workflows/) are used to run the
+tests.  The tests are divided into groups and each workflow triggers
+these test groups in parallel, which significantly reduces end-to-end
+execution time.
 
-There are three scripts used with each workflow, all of them are located in [ci/azureml_tests](./ci/azureml_tests/):
+These workflows is composed of:
+* two [reusable workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
+  + They are used by other workflows configured for different compute
+    environments and test categories.
+  + They use different infrastructures to run the tests.
+    - [`compshare-vm.yml`](../.github/workflows/compshare-vm.yml) runs
+      the tests on VMs created on demand.  And the service is now
+      provided by [Compshare](self-hosted-runner.yml) from UCloud via
+      its APIs.
+    - [`self-hosted-runner.yml`](../.github/workflows/self-hosted-runner.yml)
+      runs the test on pre-allocated VMs set up as GitHub Actions
+      self-hosted runners.
+  + Both of them include 2 jobs:
+    - `get-test-groups` extracts test groups collected in the
+      configuration file [`test_groups.yml`](./test_groups.yml) to be
+      run in parallel in the workflows.
+    - `execute-tests` runs one test group output from
+      `get-test-groups` in a Docker container with appropriate
+      environment set up in the
+      [`Dockerfile`](../tools/docker/Dockerfile).  More details on
+      Docker support can be found at
+      [tools/docker/README.md](../tools/docker/README.md).
+* one configuration file
+  + [`test_groups.yml`](./test_groups.yml): this configuration file
+    defines the groups of tests.
+    - If the tests are part of the unit tests, the total compute time
+      of each group should be less than 15min.
+    - If the tests are part of the nightly builds, the total time of
+      each group should be less than 35min.
 
-* `submit_groupwise_azureml_pytest.py`: this script uses parameters in the workflow yml to set up the AzureML environment for testing using the AzureML SDK.
-* `run_groupwise_pytest.py`: this script uses pytest to run the tests of the libraries and notebooks. This script runs in an AzureML workspace with the environment created by the script above.
-* `test_groups.py`: this script defines the groups of tests. If the tests are part of the unit tests, the total compute time of each group should be less than 15min. If the tests are part of the nightly builds, the total time of each group should be less than 35min.
 
 ## How to contribute tests to the repository
 
@@ -68,21 +117,19 @@ In this section we show how to create tests and add them to the test pipeline. T
 1. Create your code in the library and/or notebooks.
 1. Design the unit tests for the code.
 1. If you have written a notebook, design the notebook tests and check that the metrics they return is what you expect.
-1. Add the tests to the AzureML pipeline in the corresponding [test group](./ci/azureml_tests/test_groups.py). 
+1. Add the tests to the GitHub workflows in the corresponding [test
+   group](./test_groups.yml).
 
-**Please note that if you don't add your tests to the pipeline, they will not be executed.**
+**Please note that if you don't add your tests to the workflows, they
+will not be executed.**
+
 
 ### How to create tests for the Recommenders library
 
-You want to make sure that all your code works before you submit it to the repository. Here are some guidelines for creating the unit tests:
+You want to make sure that all your code works before you submit it to the repository. Here are some guidelines for creating the tests:
 
 * It is better to create multiple small tests than one large test that checks all the code.
 * Use `@pytest.fixture` to create data in your tests.
-* Use the mark `@pytest.mark.gpu` if you want the test to be executed
-  in a GPU environment. Use `@pytest.mark.spark` if you want the test
-  to be executed in a Spark environment.
-* Use `@pytest.mark.notebooks` if you are testing a notebook.
-* Avoid using `is` in the asserts, instead use the operator `==`.
 * Follow the pattern `assert computation == value`, for example:
 ```python
 assert results["precision"] == pytest.approx(0.330753)
@@ -92,6 +139,11 @@ assert results["precision"] == pytest.approx(0.330753)
 assert rmse(rating_true, rating_true) == 0
 assert rmse(rating_true, rating_pred) == pytest.approx(7.254309)
 ```
+* Use the operator `==` with values. Use the operator `is` in singletons like `None`, `True` or `False`.
+* Make explicit asserts. In other words, make sure you assert to something (`assert computation == value`) and not just `assert computation`.
+* Use the mark `@pytest.mark.gpu` if you want the test to be executed in a GPU environment. Use `@pytest.mark.spark` if you want the test to be executed in a Spark environment.
+* Use `@pytest.mark.notebooks` if you are testing a notebook.
+
 
 ### How to create tests for the notebooks
 
@@ -172,71 +224,186 @@ For executing this test, first make sure you are in the correct environment as d
 pytest tests/smoke/examples/test_notebooks_python.py::test_sar_single_node_smoke
 ```
 
-### How to add tests to the AzureML pipeline
+### How to add tests to the GitHub workflows
 
-To add a new test to the AzureML pipeline, add the test path to an appropriate test group listed in [test_groups.py](./ci/azureml_tests/test_groups.py). 
+To add a new test to the GitHub workflows, add the test path to an
+appropriate test group listed in [test_groups.yml](./test_groups.yml).
 
-Tests in `group_cpu_xxx` groups are executed on a CPU-only AzureML compute cluster node. Tests in `group_gpu_xxx` groups are executed on a GPU-enabled AzureML compute cluster node with GPU related dependencies added to the AzureML run environment. Tests in `group_pyspark_xxx` groups are executed on a CPU-only AzureML compute cluster node, with the PySpark related dependencies added to the AzureML run environment. 
+Tests in `group_cpu_xxx` groups are executed on a CPU-only GitHub
+compute node.  Tests in `group_gpu_xxx` groups are executed on a
+GPU-enabled compute node with GPU related dependencies added to the
+environment.  Tests in `group_pyspark_xxx` groups are executed on a
+CPU-only compute node, with the PySpark related dependencies added to
+the environment.
 
-It's important to keep in mind while adding a new test that the runtime of the test group should not exceed the specified threshold in [test_groups.py](./ci/azureml_tests/test_groups.py).
+It's important to keep in mind while adding a new test that the
+runtime of the test group should not exceed the specified threshold in
+[test_groups.yml](./test_groups.yml).
 
 Example of adding a new test:
 
 1. In the environment that you are running your code, first see if there is a group whose total runtime is less than the threshold.
-```python
-"group_spark_001": [  # Total group time: 271.13s
-    "tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df",  # 4.33s+ 25.58s + 101.99s + 139.23s
-],
+
+```yaml
+group_spark_001: # Total group time: 271.13s
+  - tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df  # 4.33s+ 25.58s + 101.99s + 139.23s
 ```
+
 2. Add the test to the group, add the time it takes to compute, and update the total group time.
-```python
-"group_spark_001": [  # Total group time: 571.13s
-    "tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df",  # 4.33s+ 25.58s + 101.99s + 139.23s
-    #
-    "tests/path/to/test_new.py::test_new_function", # 300s
-],
+
+```yaml
+group_spark_001: [  # Total group time: 571.13s
+  -  tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df  # 4.33s+ 25.58s + 101.99s + 139.23s
+  -  tests/path/to/test_new.py::test_new_function  # 300s
 ```
+
 3. If all the groups of your environment are above the threshold, add a new group.
 
-### Setup GitHub Actions with AzureML compute clusters
 
-In this section we explain how to create the AzureML infrastructure to run the tests in GitHub Actions.
+## How to set up the infrastructure
 
-In order to execute the tests in Recommenders, we need two types of virtual machines: ones without GPU, to execute the CPU and Spark tests, and ones with GPU, to execute the GPU tests. Therefore, the first step is to request enough quota for your subscription.
+### How to set up GitHub Actions runners
 
-Then, follow the steps below to create the AzureML infrastructure:
+In this section we explain how to create the infrastructure to run the
+tests via self-hosted GitHub Actions runners used in
+[`self-hosted-runner.yml`](../.github/workflows/self-hosted-runner.yml).
 
-1. Create a new AzureML workspace.
-    - Name: `azureml-test-workspace`
-    - Resource group: `recommenders_project_resources`
-    - Location: *Make sure you have enough quota in the location you choose*
-2. Create two new clusters: `cpu-cluster` and `gpu-cluster`. Go to compute, then compute cluster, then new.
-    - Select the CPU VM base. Anything above 64GB of RAM, and 8 cores should be fine.
-    - Select the GPU VM base. Anything above 56GB of RAM, and 6 cores, and an NVIDIA K80 should be fine.
-3. Add the subscription ID to GitHub action secrets [here](https://github.com/recommenders-team/recommenders/settings/secrets/actions). Create a new repository secret called `AZUREML_TEST_SUBID` and add the subscription ID as the value.
-4. Make sure you have installed [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli), and that you are logged in: `az login`.
-5. Select your subscription: `az account set -s $AZURE_SUBSCRIPTION_ID`.
-6. Create a Service Principal: `az ad sp create-for-rbac --name $SERVICE_PRINCIPAL_NAME --role contributor --scopes /subscriptions/$AZURE_SUBSCRIPTION_ID --json-auth`. This will output a JSON blob with the credentials of the Service Principal:
-    ```
-    {
-        "clientId": "XXXXXXXXXXXXXXXXXXXXX",
-        "clientSecret": "XXXXXXXXXXXXXXXXXXXXX",
-        "subscriptionId": "XXXXXXXXXXXXXXXXXXXXX",
-        "tenantId": "XXXXXXXXXXXXXXXXXXXXX",
-        "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
-        "resourceManagerEndpointUrl": "https://management.azure.com/",
-        "activeDirectoryGraphResourceId": "https://graph.windows.net/",
-        "sqlManagementEndpointUrl": "https://management.core.windows.net:8443/",
-        "galleryEndpointUrl": "https://gallery.azure.com/",
-        "managementEndpointUrl": "https://management.core.windows.net/"
-    }
-    ```
-7. Add the output as github's action secret `AZUREML_TEST_CREDENTIALS` under repository's **Settings > Security > Secrets and variables > Actions**.
+In a nutshell, this requires the following steps:
+1. Set up several self-hosted GitHub Actions runners described below.
+1. Modify the workflows `unit-tests.yml`, `cpu-nightly.yml`,
+   `gpu-nightly.yml` and `spark-nightly.yml` to use
+   `self-hosted-runner.yml`.
+
+We use 3 types of GitHub Actions runners to execute the tests in
+Recommenders:
+1. free [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)
+   (16GB memory by default), to execute the CPU and Spark tests in PR
+   gates.
+1. [self-hosted runners](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)
+   with GPU, to execute the GPU tests
+1. self-hosted runners without GPU but having larger memory (64GB), to
+   execute the nightly CPU tests
+
+The
+[image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md)
+for GitHub-hosted runners have everything required installed, so we
+don't have to do extra setup.  In addition, for public repositories,
+GitHub has [usage
+limits](https://docs.github.com/en/actions/reference/limits) for
+GitHub-hosted runners.
+
+For self-hosted runners, follow the steps below for setup:
+1. Install the following prerequisites on the VMs.
+   * [Docker](https://docs.docker.com/engine/install)
+     + Docker daemon should be configured run in [rootless
+       mode](https://docs.docker.com/engine/security/rootless/).
+   * (For GPU runners) [NVIDIA container toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+1. Follow the steps described in [Adding self-hosted
+   runners](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
+   to add the VMs as self-hosted runners on GitHub.
+   * Currently, we have 2 runner groups.
+     + `GPU`, for GPU runners.
+     + `CPU`, for CPU runners with larger memory (64GB).
+   * However, which runners are identified as GPU runners or CPU
+     runners is determined by their labels instead of their runner
+     groups.  So we have to label GPU runners as `GPU` and CPU runners
+     as `CPU` in the configure step.
+1. Schedule Docker build cache cleanup by adding the following entry
+   into crontab.
+   
+   ```
+   0 * * * * docker buildx prune -f --min-free-space 80gb
+   ```
+
+   * The amount of free space required (`80gb` in the example above)
+     can vary depending on the actual specification of the VMs.
+
+
+### How to set up Compshare VMs for on-demand creation
+
+In this section we explain how to create the infrastructure to run the
+tests via VMs on demand used in
+[`compshare-vm.yml`](../.github/workflows/compshare-vm.yml).
+
+In addition to set up VMs as self-hosted runners waiting for testing
+jobs described the previous section, we also try to allocate VMs on
+demand from other cheaper cloud service providers, such as
+[Compshare](https://www.compshare.cn) from UCloud.  However, different
+cloud services offer different APIs and tools.  To unify the
+management and provisioning,
+[Terraform](https://developer.hashicorp.com/terraform) can be used.
+Alas, since Terraform is not supported by the current service provider
+Compshare, we develop some shell scripts under
+[`.github/workflows/tools/compshare/`](../.github/workflows/tools/compshare/)
+for our basic usage of VM allocation from Compshare.
+
+Before using `compshare-vm.yml`, follow the steps below for the setup:
+1. Log into [Compshare console](https://passport.compshare.cn/login).
+1. Create API keys (one API private key and one API public key) for
+   the shell scripts to interact with the APIs.
+1. (Optional) Create a VM as pull-through caches/mirrors for Docker,
+   PyPI index and HTTP/HTTPS proxy.
+   * [devpi-server](https://pypi.org/project/devpi-server/) can be
+     used for caching PyPI index.
+   * [Distribution
+     Registry](https://distribution.github.io/distribution/) can be
+     use for caching Docker Hub.
+   * [Squid](https://www.squid-cache.org/) can be used to cache for
+     other HTTP/HTTPS requests.
+1. Create 7 repository secret
+   * Go to Recommenders repo $\to$ Settings $\to$ Secrets and variables
+     $\to$
+     [Actions](https://github.com/recommenders-team/recommenders/settings/secrets/actions)
+     $\to$ New repository secret
+     + For the API private key
+       - Name: `COMPSHARE_PRIVATE_KEY`
+       - Secret: value of the API private key
+     + For the API public key
+       - Name: `COMPSHARE_PUBLIC_KEY`
+       - Secret: value of the API public key
+     + (Optional) For Docker Hub
+       - Name: `VM_DOCKER_MIRROR_URL`
+       - Secret: URL of the Docker Hub mirror
+     + (Optional) For PyPI index
+       - Name: `VM_PIP_INDEX_URL`
+       - Secret: URL of the PyPI index mirror
+     + (Optional) For HTTP proxy
+       - Name: `VM_HTTP_PROXY`
+       - Secret: URL of the HTTP proxy
+     + (Optional) For HTTPS proxy
+       - Name: `VM_HTTPS_PROXY`
+       - Secret: URL of the HTTPS proxy
+     + (Optional) For HTTPS proxy CA certificate
+       - Name: `VM_PROXY_CERTIFICATE`
+       - Secret: content of the certificate
+1. Modify the workflows `unit-tests.yml`, `cpu-nightly.yml`,
+   `gpu-nightly.yml` and `spark-nightly.yml` to use
+   `compshare-vm.yml`.
+
+NOTE: By default, secrets are not passed to workflows triggered by the
+[`pull_request`](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
+event from forked repositories according to [the
+doc](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflows-in-forked-repositories).
+So we use the
+[`pull_request_target`](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target)
+event to trigger PR gates.
+* If there are any changes to the infrastructure that modifies the
+  workflow for PR gates (i.e., changes made into
+  [`./github/workflows/`](../.github/workflows/)), they should be
+  merged into the `main` branch to take effect.
+* Other changes not related to the infrastructure, such as changes
+  made into [`recommenders/`](../recommenders/),
+  [`tests/`](../tests/), and [`examples`](../examples/), can take
+  effect immediately in PR gates without having to merge into `main`.
 
 
 ## How to execute tests in your local environment
 
-To manually execute the tests in the CPU, GPU or Spark environments, first **make sure you are in the correct environment as described in the [SETUP.md](../SETUP.md)**.
+To manually execute the tests in the CPU, GPU or Spark environments,
+first **make sure you are in the correct environment as described in
+the [SETUP.md](../SETUP.md)**.  In addition, [using VS Code together
+with Dev containers] for testing is much easier, since VS Code can
+detect tests automatically.
 
 ### CPU tests
 
@@ -290,4 +457,3 @@ Example:
     @pytest.mark.skipif(sys.platform == 'win32', reason="Not implemented on Windows")
     def test_to_skip():
         assert False
-

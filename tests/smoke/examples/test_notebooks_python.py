@@ -49,6 +49,7 @@ def test_baseline_deep_dive_smoke(notebooks, output_notebook, kernel_name):
     assert results["recall"] == pytest.approx(0.108826, rel=TOL, abs=ABS_TOL)
 
 
+@pytest.mark.skip(reason="Put back in core deps when #2224 is fixed")
 @pytest.mark.notebooks
 def test_surprise_svd_smoke(notebooks, output_notebook, kernel_name):
     notebook_path = notebooks["surprise_svd_deep_dive"]
@@ -114,6 +115,21 @@ def test_lightgbm_quickstart_smoke(notebooks, output_notebook, kernel_name):
     assert results["logloss_basic"] == pytest.approx(0.4669, rel=TOL, abs=ABS_TOL)
     assert results["auc_opt"] == pytest.approx(0.7757, rel=TOL, abs=ABS_TOL)
     assert results["logloss_opt"] == pytest.approx(0.4607, rel=TOL, abs=ABS_TOL)
+
+
+@pytest.mark.notebooks
+def test_lightgbm_movielens_smoke(notebooks, output_notebook, kernel_name):
+    notebook_path = notebooks["lightgbm_movielens"]
+    execute_notebook(
+        notebook_path,
+        output_notebook,
+        kernel_name=kernel_name,
+        parameters=dict(MOVIELENS_DATA_SIZE="100k"),
+    )
+    results = read_notebook(output_notebook)
+
+    assert results["map_at_10"] == pytest.approx(0.1408, rel=TOL, abs=ABS_TOL)
+    assert results["ndcg_at_10"] == pytest.approx(0.2442, rel=TOL, abs=ABS_TOL)
 
 
 @pytest.mark.notebooks

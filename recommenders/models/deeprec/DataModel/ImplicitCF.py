@@ -1,7 +1,9 @@
 # Copyright (c) Recommenders contributors.
 # Licensed under the MIT License.
 
+import logging
 import random
+
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -12,6 +14,8 @@ from recommenders.utils.constants import (
     DEFAULT_RATING_COL,
     DEFAULT_PREDICTION_COL,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ImplicitCF(object):
@@ -80,6 +84,7 @@ class ImplicitCF(object):
             user_idx = df[[self.col_user]].drop_duplicates().reindex()
             user_idx[self.col_user + "_idx"] = np.arange(len(user_idx))
             self.n_users = len(user_idx)
+            self.n_users_in_train = train[self.col_user].nunique()
             self.user_idx = user_idx
 
             self.user2id = dict(
@@ -155,7 +160,7 @@ class ImplicitCF(object):
             if self.adj_dir is None:
                 raise FileNotFoundError
             norm_adj_mat = sp.load_npz(self.adj_dir + "/norm_adj_mat.npz")
-            print("Already load norm adj matrix.")
+            logger.info("Already load norm adj matrix.")
 
         except FileNotFoundError:
             norm_adj_mat = self.create_norm_adj_mat()
@@ -179,7 +184,7 @@ class ImplicitCF(object):
         adj_mat[: self.n_users, self.n_users :] = R
         adj_mat[self.n_users :, : self.n_users] = R.T
         adj_mat = adj_mat.todok()
-        print("Already create adjacency matrix.")
+        logger.info("Already create adjacency matrix.")
 
         rowsum = np.array(adj_mat.sum(1))
         d_inv = np.power(rowsum + 1e-9, -0.5).flatten()
@@ -187,7 +192,7 @@ class ImplicitCF(object):
         d_mat_inv = sp.diags(d_inv)
         norm_adj_mat = d_mat_inv.dot(adj_mat)
         norm_adj_mat = norm_adj_mat.dot(d_mat_inv)
-        print("Already normalize adjacency matrix.")
+        logger.info("Already normalize adjacency matrix.")
 
         return norm_adj_mat.tocsr()
 
@@ -205,12 +210,14 @@ class ImplicitCF(object):
         """
 
         def sample_neg(x):
+            if len(x) >= self.n_items:
+                raise ValueError("A user has voted in every item. Can't find a negative sample.")
             while True:
                 neg_id = random.randint(0, self.n_items - 1)
                 if neg_id not in x:
                     return neg_id
 
-        indices = range(self.n_users)
+        indices = range(self.n_users_in_train)
         if self.n_users < batch_size:
             users = [random.choice(indices) for _ in range(batch_size)]
         else:

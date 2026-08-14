@@ -11,12 +11,19 @@ from tempfile import TemporaryDirectory
 from tqdm import tqdm
 from retrying import retry
 
-
 log = logging.getLogger(__name__)
+
+DEFAULT_DOWNLOAD_TIMEOUT = (10, 60)
 
 
 @retry(wait_random_min=1000, wait_random_max=5000, stop_max_attempt_number=5)
-def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
+def maybe_download(
+    url,
+    filename=None,
+    work_directory=".",
+    expected_bytes=None,
+    timeout=DEFAULT_DOWNLOAD_TIMEOUT,
+):
     """Download a file if it is not already downloaded.
 
     Args:
@@ -24,6 +31,7 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
         work_directory (str): Working directory.
         url (str): URL of the file to download.
         expected_bytes (int): Expected file size in bytes.
+        timeout (float|tuple): Requests timeout for the download.
 
     Returns:
         str: File path of the file downloaded.
@@ -32,8 +40,14 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
         filename = url.split("/")[-1]
     os.makedirs(work_directory, exist_ok=True)
     filepath = os.path.join(work_directory, filename)
+    if os.path.exists(filepath):
+        if filepath.endswith(".zip") and not is_valid_zip(filepath):
+            log.warning(f"File {filepath} is corrupt, re-downloading")
+            os.remove(filepath)
+        else:
+            log.info(f"File {filepath} already downloaded")
     if not os.path.exists(filepath):
-        r = requests.get(url, stream=True)
+        r = requests.get(url, stream=True, timeout=timeout)
         if r.status_code == 200:
             log.info(f"Downloading {url}")
             total_size = int(r.headers.get("content-length", 0))
@@ -50,8 +64,6 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
         else:
             log.error(f"Problem downloading {url}")
             r.raise_for_status()
-    else:
-        log.info(f"File {filepath} already downloaded")
     if expected_bytes is not None:
         statinfo = os.stat(filepath)
         if statinfo.st_size != expected_bytes:
@@ -59,6 +71,23 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
             raise IOError(f"Failed to verify {filepath}")
 
     return filepath
+
+
+def is_valid_zip(filepath):
+    """Check if a file is a valid zip file.
+
+    Args:
+        filepath (str): Path to the file to check.
+
+    Returns:
+        bool: True if the file is a valid zip file, False otherwise.
+    """
+    try:
+        with zipfile.ZipFile(filepath, "r") as z:
+            z.testzip()
+        return True
+    except (zipfile.BadZipFile, OSError):
+        return False
 
 
 @contextmanager

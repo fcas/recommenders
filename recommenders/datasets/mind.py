@@ -17,26 +17,37 @@ from recommenders.datasets.download_utils import (
 )
 
 
-URL_MIND_LARGE_TRAIN = (
-    "https://mind201910small.blob.core.windows.net/release/MINDlarge_train.zip"
-)
-URL_MIND_LARGE_VALID = (
-    "https://mind201910small.blob.core.windows.net/release/MINDlarge_dev.zip"
-)
-URL_MIND_SMALL_TRAIN = (
-    "https://mind201910small.blob.core.windows.net/release/MINDsmall_train.zip"
-)
-URL_MIND_SMALL_VALID = (
-    "https://mind201910small.blob.core.windows.net/release/MINDsmall_dev.zip"
-)
 URL_MIND_DEMO_TRAIN = (
-    "https://recodatasets.z20.web.core.windows.net/newsrec/MINDdemo_train.zip"
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDdemo_train.zip"
 )
 URL_MIND_DEMO_VALID = (
-    "https://recodatasets.z20.web.core.windows.net/newsrec/MINDdemo_dev.zip"
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDdemo_dev.zip"
 )
 URL_MIND_DEMO_UTILS = (
-    "https://recodatasets.z20.web.core.windows.net/newsrec/MINDdemo_utils.zip"
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDdemo_utils.zip"
+)
+
+URL_MIND_SMALL_TRAIN = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDsmall_train.zip"
+)
+URL_MIND_SMALL_VALID = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDsmall_dev.zip"
+)
+URL_MIND_SMALL_UTILS = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDsmall_utils.zip"
+)
+
+URL_MIND_LARGE_TRAIN = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_train.zip"
+)
+URL_MIND_LARGE_VALID = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_dev.zip"
+)
+URL_MIND_LARGE_TEST = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_test.zip"
+)
+URL_MIND_LARGE_UTILS = (
+    "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_utils.zip"
 )
 
 URL_MIND = {

@@ -32,14 +32,13 @@ They have admin access to the repo and provide support reviewing issues and pull
 * **[Miguel González-Fierro](https://github.com/miguelfierro)**
    * Recommendation algorithms review, development and optimization.
    * Reco utils review, development and optimization.
-   * Github statistics.
    * Continuous integration build / test setup.
 * **[Scott Graham](https://github.com/gramhagen)**
    * Improving documentation
    * VW notebook
 * **[Simon Zhao](https://github.com/simonyansenzhao)**
    * SARplus algorithm upgrade
-* **[Tao Wu](https://github.com/wutaomsft)**
+* **[Tao Wu](https://github.com/wav8k)**
    * Improving documentation
 
 
@@ -52,6 +51,8 @@ To contributors: please add your name to the list when you submit a patch to the
 * **[Aaron He](https://github.com/AaronHeee)**
    * Reco utils of NCF
    * Deep dive notebook demonstrating the use of NCF
+* **[Aaron Palpallatoc](https://github.com/ubergonmx)**
+   * Corrected variable in pickle dump in `mind_utils.ipynb` notebook
 * **[Abir Chakraborty](https://github.com/aeroabir)**
    * Self-Attentive Sequential Recommendation (SASRec)
    * Sequential Recommendation Via Personalized Transformer (SSEPT)
@@ -74,6 +75,8 @@ To contributors: please add your name to the list when you submit a patch to the
    * SAR PySpark improvement
 * **[Daniel Schneider](https://github.com/danielsc)**
    * FastAI notebook
+* **[David Davó](https://github.com/daviddavo)**
+   * Added R-Precision metric
 * **[Evgenia Chroni](https://github.com/EvgeniaChroni)**
    * Multinomial VAE algorithm
    * Standard VAE algorithm
@@ -86,6 +89,8 @@ To contributors: please add your name to the list when you submit a patch to the
 * **[Jianjie Liu](https://github.com/laserprec/)**
    * GitHub Action Migration
    * Test Infrastructure Optimization
+* **[Jose Arrieta](https://github.com/jmarrietar)**
+   * Embedding Dot Bias	algorithm and notebook quickstart
 * **[Kaisar Mussalim](https://github.com/kmussalim)**
    * Multinomial VAE algorithm
    * Standard VAE algorithm
@@ -127,6 +132,9 @@ To contributors: please add your name to the list when you submit a patch to the
    * Windows test pipelines
 * **[Satyadev Ntv](https://github.com/satyadevntv)**
    * GeoIMC algorithm
+* **[Wook Lee](https://github.com/ds-wook)**
+   * LightGBM ranking notebook with MovieLens dataset and LambdaRank documentation
+   * LightGBM Ranker integration and unit tests for ranking support
 * **[Yan Zhang](https://github.com/YanZhangADS)**
    * Diversity metrics including coverage, novelty, diversity, and serendipity
    * Diversity metrics evaluation sample notebook
@@ -135,4 +143,3 @@ To contributors: please add your name to the list when you submit a patch to the
 * **[Zhenhui Xu](https://github.com/motefly)**
    * Reco utils of LightGBM
    * LightGBM notebook quickstart
-    

@@ -24,12 +24,13 @@ def test_prepare_hparams(deeprec_resource_path, must_exist_attributes):
     yaml_file = os.path.join(data_path, "xDeepFM.yaml")
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/deeprec/",
+            "https://raw.githubusercontent.com/recommenders-team/resources/main/deeprec/",
             data_path,
             "xdeepfmresources.zip",
         )
     hparams = prepare_hparams(yaml_file)
-    assert hasattr(hparams, must_exist_attributes)
+
+    assert hasattr(hparams, must_exist_attributes) is True
 
 
 @pytest.mark.gpu
@@ -39,10 +40,10 @@ def test_load_yaml_file(deeprec_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/deeprec/",
+            "https://raw.githubusercontent.com/recommenders-team/resources/main/deeprec/",
             data_path,
             "xdeepfmresources.zip",
         )
-
     config = load_yaml(yaml_file)
+
     assert config is not None

@@ -6,14 +6,17 @@ import pytest
 import itertools
 import numpy as np
 import pandas as pd
-from lightfm.data import Dataset
-from lightfm import LightFM, cross_validation
 
-from recommenders.models.lightfm.lightfm_utils import (
-    track_model_metrics,
-    similar_users,
-    similar_items,
-)
+try:
+    from lightfm.data import Dataset
+    from lightfm import LightFM, cross_validation
+    from recommenders.models.lightfm.lightfm_utils import (
+        track_model_metrics,
+        similar_users,
+        similar_items,
+    )
+except ModuleNotFoundError:
+    pass
 
 
 SEEDNO = 42
@@ -128,6 +131,7 @@ def sim_items(interactions, fitting):
     )
 
 
+@pytest.mark.experimental
 def test_interactions(interactions):
     train_interactions, test_interactions, item_features, user_features = interactions
     assert train_interactions.shape == (10, 10)
@@ -136,6 +140,7 @@ def test_interactions(interactions):
     assert user_features.shape == (10, 17)
 
 
+@pytest.mark.experimental
 @pytest.mark.skip(reason="Flaky test")
 def test_fitting(fitting):
     output, _ = fitting
@@ -152,9 +157,41 @@ def test_fitting(fitting):
     np.testing.assert_array_equal(output, target)
 
 
+@pytest.mark.experimental
 def test_sim_users(sim_users):
     assert sim_users.shape == (5, 2)
 
 
+@pytest.mark.experimental
 def test_sim_items(sim_items):
     assert sim_items.shape == (5, 2)
+
+
+@pytest.mark.experimental
+def test_prepare_test_df():
+    try:
+        from scipy import sparse
+        from recommenders.models.lightfm.lightfm_utils import prepare_test_df
+    except ModuleNotFoundError:
+        pytest.skip("lightfm or scipy not installed")
+        return
+
+    uids = np.array([0, 1, 2, 0, 1])
+    iids = np.array([0, 1, 2, 1, 0])
+    uid_map = {"user_a": 0, "user_b": 1, "user_c": 2}
+    iid_map = {"item_x": 0, "item_y": 1, "item_z": 2}
+    
+    weights_data = [1.0, 2.0, 3.0, 4.0, 5.0]
+    weights = sparse.coo_matrix(
+        (weights_data, (uids, iids)),
+        shape=(3, 3)
+    )
+    
+    test_idx = slice(0, 3)
+    result = prepare_test_df(test_idx, uids, iids, uid_map, iid_map, weights)
+    
+    assert result.shape[0] == 3, "Should have 3 rows"
+    assert list(result.columns) == ["userID", "itemID", "rating"], "Should have correct columns"
+    assert result["userID"].tolist() == ["user_a", "user_b", "user_c"], "User IDs should be mapped correctly"
+    assert result["itemID"].tolist() == ["item_x", "item_y", "item_z"], "Item IDs should be mapped correctly"
+    assert result["rating"].tolist() == [1.0, 2.0, 3.0], "Ratings should be correct"
